@@ -1,0 +1,220 @@
+---
+title: "Project 2"
+author: "Achraf Cherkaoui"
+#date: "Sept 23, 2021"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+    keep_tex: yes  
+header-includes:
+  - \usepackage{color}  
+urlcolor: blue  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Classification
+
+In this classification setting, we use a `wine` dataset of chemical measurement of two variables, `Color_intensity` and `Alcalinity_of_ash`, on 130 wines from two cultivars in a region in Italy. 
+
+The data set is a subset of a data set from <https://archive.ics.uci.edu/ml/datasets/Wine>, see that page or <http://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.names> for information of the source of the data.
+
+First, read the original data in, keep the response `class`, and predictors `Alcalinity_of_ash` and `Color_intensity`. We only use 2 classes (there are 3 classes in the original dataset) and we re-code them to be $y=0$ or 1. Also, we rename `Alcalinity_of_ash` and `Color_intensity` to be $x_1$ and $x_2$.
+
+Then, we make plot and visualize the relation between the variables. Look at **the pairwise correlation between $x_1$, $x_2$, and $y$**.
+
+```{r Dataset,echo=TRUE, warning=FALSE,message=FALSE,eval=TRUE,out.width='60%', fig.align='center', fig.pos='h'}
+library(ggplot2)
+library(GGally)
+
+wine = read.table(file = "http://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data",  
+                  sep = ",", head=F)
+colnames(wine) = c("class", "Alcohol", "Malic_acid", "Ash", "Alcalinity_of_ash", "Magnesium", 
+                   "Total_phenols", "Flavanoids", "Nonflavanoid_phenols", "Proanthocyanins", 
+                   "Color_intensity", "Hue", "OD280/OD315_of_diluted wines", "Proline")
+wine = wine[which(wine$class!=3),c(1,5,11)]
+wine$class=as.factor(wine$class-1)
+colnames(wine)=c("y","x1","x2")
+ggpairs(wine, ggplot2::aes(color=y)) + theme_bw(18)
+```
+Obviously, the data is a roughly \textbf{balanced} dataset.
+
+Then, we would like to use **Logistic regression**, **LDA**, and **KNN** methods to estimate the test error rates. To do so, we will use the **Validation Set** approach. So, now we split the dataset to be the `train` and `test` datasets.
+
+```{r Split dataset,echo=TRUE, warning=FALSE,message=FALSE,eval=TRUE,out.width='60%', fig.align='center', fig.pos='h'}
+n <- nrow(wine)
+set.seed(43855385) # You can change the seed to your favorite number
+reorder = sample(1:n) # shuffle 
+test = wine[reorder[1:(n/2)],]
+train = wine[reorder[((n/2)+1):n],] 
+```
+
+
+
+### a) Logistic Regression
+
+**\color{red}{Question 1}**: Fit a **logistic regression** model on $y\sim x1+x2$ to the training set and name the result **LR.Wine**. Show the summary of **LR.Wine**.
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+
+LR.Wine <- glm(y~x1+x2, data=train, family="binomial")
+summary(LR.Wine)
+```
+
+**\color{red}{Question 2}**: Based on your estimates of $\beta_1$ and $\beta_2$. Give their specific interpretation in words.
+
+**Answer**: 
+$\beta_1$= 0.4309, with one unite increase in  x_1 leads to an increases of 0.4309 in the  log-odds of class. 
+$\beta_1$= 0.4309, then e$\beta_1$ = 1.5386 and the interpretation becomes: An increase of one unite in  x_1  multiplies the odds of class by 1.53886.
+an increase of one unite in  x_1 is associated with an increase of 53.8% in the odds of class.  increases by 53.8% (1.5386 - 1 = 0.5386). 
+
+$\beta_2$= -1.8542 , with one unite increase in x_2 leads to a decreases of 1.8542 in the  log-odds of class.
+$\beta_2$= -1.8542 , then e$\beta_1$ = 0.1566  and the interpretation becomes :  an increase of one unite in  x_2 is associated with a decrease of 84.3% in the odds of class.  decreases by 84.3% (1- 0.1566 = 0.8434). 
+
+**\color{red}{Bonus Question 3}**: (Bonus question for both Math 4385 and 5385)**: Use the estimates $\hat{\beta}_1$ and $\hat{\beta}_2$ to manually find **the equation of the decision boundary** in the form of $x_2=\text{intercept}+\text{slope} \times x_1$ using the decision rule $\hat{P}(Y=1|\boldsymbol {x})=0.5$ (Hint: at 0.5 decision boundary, the logit $=\hat{\beta}_0+\hat{\beta}_1\cdot x_1 +\hat{\beta}_2\cdot x_2 =0$). Then make a plot for $(x_1,x_2)$ of both the training data with classes (i.e., $y$) color-coded and the decision boundary.
+
+**Answer**: 
+
+The decision boundary can be derived as follows: 
+
+$\hat{\beta}_0+\hat{\beta}_1\cdot x_1 +\hat{\beta}_2\cdot x_2 =0$
+
+$x_2= \hat{\beta}_0 /(-\hat{\beta}_2) + \hat{\beta}_1/(-\hat{\beta}_2)\cdot x_1$
+
+$x_2= 0.154/-(-1.854) + 0.431/-(-1.854)\cdot x_1$
+
+$x_2 = 0.831 + 0.232\cdot x_1$
+
+-intercept = 0.0831.
+
+-slope = 0.232 .
+
+
+The plot is shown below (**Note**: To let R run the following chunk, change the following setting `eval=FALSE` to be `eval=TRUE`)
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval= TRUE, out.width='60%', fig.align='center', fig.pos='h'}
+slope_0 <-coef(LR.Wine)[2]/(-coef(LR.Wine)[3])
+intercept_0 <- coef(LR.Wine)[1]/(-coef(LR.Wine)[3]) 
+  
+g1 = ggplot(data=train, aes(x=x1, y=x2, colour=y)) + 
+       geom_point(pch = 1) + theme_bw(18) # Plot the training data
+g1 + geom_abline(slope = slope_0,intercept=intercept_0) + 
+     ggtitle("Trainning data and logistic boundary") + 
+     theme_bw(18) # Add the decision boundary 
+     # Change the slope_0 and intercept_0 to be the values found in your derived decision boundary.
+```
+**\color{red}{Question 4}**: Use the `predict()` function to calculate the predicted probabilities for all observations in the test set. Name the results \textbf{`LR.pred.prob`.}
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+LR.pred.prob <- predict(LR.Wine,newdata = test ,type="response")
+LR.pred.prob 
+
+```
+
+
+
+**\color{red}{Question 5}**: Use 0.5 as cutoff to make predictions for class (i.e., $y$) on test data and name the prediction object as `LR.pred`.
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+
+LR.pred <- ifelse(LR.pred.prob > 0.5 , 1,0)
+LR.pred 
+
+```
+
+**\color{red}{Question 6}**: Use  make the **confusion matrix**, find the test error rate, sensitivity, specificity. 
+
+**\color{green}{Answer 6}**: the test error rate is **9.23** , the sensitivity **97.1** , the specificity **83.3**
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE} 
+LR.table <- table(test$y,LR.pred )
+LR.table 
+sensitivity <- (34/35)*100 
+specificity <- (25/30)*100
+sensitivity 
+specificity
+testerrorrate <- (6/65)*100
+testerrorrate
+```
+ 
+### b) LDA 
+
+**\color{red}{Question 1}**: Perform LDA method (use `lda()`) to the training data and name the resulting object `LDA.Wine`. Show `LDA.Wine` (Note: Not the summary of `LDA.Wine` as we did for linear or logistic regression.)
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+library(MASS)
+LDA.Wine <- lda(y~ x1+x2 , data = train)
+LDA.Wine 
+```
+
+**\color{red}{Question 2}**: Use the `predict()` function to calculate the predicted class for the test set (0.5 is the default cutoff).
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+
+la.pre <- predict(LDA.Wine ,test)
+la.pre
+
+```
+
+**\color{red}{Question 3}**: Make the **confusion matrix** and find the test error rate, sensitivity, specificity.
+
+**\color{green}{Answer 3}**: the test error rate is **9.23** , the sensitivity **97.1** , the specificity **83.3**
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+la.class <- la.pre$class
+table(test$y ,la.class )
+sensitivity <- (34/35)*100
+specificity <-(25/30)*100
+sensitivity
+specificity
+testerrorrate <- (6/65)*100
+testerrorrate
+```
+
+ 
+## 3) KNN
+
+**\color{red}{Question 1}**: Perform KNN method (use `knn()`) to the training data with $K=3$ and make prediction for the test set and name your results `KNN.Wine`. (**Note**: To let R run the following chunk, change the following setting `eval=FALSE` to be `eval=TRUE`) (0.5 is the default cutoff).
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+library(class)
+KNN.Wine <- knn(train[,c("x1","x2")], test[,c("x1","x2")], cl=train$y, k= 3,prob=TRUE)
+KNN.Wine
+
+```
+
+**\color{red}{Question 2}**:  Make the **confusion matrix** and find the test error rate, sensitivity, specificity. 
+
+**\color{green}{Answer 2}**: the test error rate is **9.23** , the sensitivity **94.3** , the specificity **86.7**
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE}
+
+KNNtable <-table(test$y,KNN.Wine)
+KNNtable
+testerrorrate <- ((4+2)/65)*100 
+testerrorrate 
+sensitivity <- ((33)/35)*100 
+sensitivity
+specificity <- (26/(26+4))*100
+specificity
+```
+
+## 4) Compare classifiers
+
+**\color{red}{Question 1}**: Compare the test error rates of the above three classifiers based on the 0.5 cut-off on posterior probability classification rule and which method would you prefer? Why? Which one is the most flexible classifier among the three?
+
+**Solution**: All the test error rate are the same for all the classification methods TER = 9.23.Moreover, the sensitivity and the specificity for logistic regression and LDA are the same compared to KNN witch is slightly different.KNN with K = 3 gave the worst results out of all methods.
+When the true decision boundaries are linear, then the LDA and logistic regression approaches will tend to perform well.
+I prefer to use logistic regression because it is easy to interpret the results from it.In this exercise the logistic regression and LDA methods tend to be more flexible because they give the best results.
+
+
+
+**\color{red}{Question 2 (For Math 5385)}**: Plot the ROC curve for your prediction of Logistic regression on the test set and calculate the AUC value. (**Note**: To let R run the following chunk, change the following setting `eval=FALSE` to be `eval=TRUE`).  Based on the AUC value, do you think if the Logistic regression is a good model for the `wine` data set ?
+
+**\color{green}{Answer 2}**: The area under the curve is between 1 and 0.9 witch means that the model is an excellent fit for our data. 
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE, eval=TRUE, out.width='60%', fig.align='center', fig.pos='h'}
+library(pROC)
+LR.roc <- roc(test$y, LR.pred.prob,legacy.axes=TRUE)
+ggroc(LR.roc)+theme_bw(28)
+auc(LR.roc)
+```
+
+ 
